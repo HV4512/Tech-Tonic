@@ -71,3 +71,36 @@ export const fetchTonics= async(pageNumber=1,pageSize=20)=>{
         throw new Error(`Error Fetching Tonics: ${error.message}`)
     }
 }
+
+export const fetchTonicById =async(id:string)=>{
+    try{
+
+        // TODO: POPULATE Community 
+        connectToDB();
+        const tonic = await Tonic.findById(id)
+        .populate({
+            path:'author',
+            model: User,
+            select:"_id id name image"
+        })
+        .populate({
+            path:'children',
+            populate:[
+                {
+                    path:'author',
+                    model:User,
+                    select:"_id id name parentId image"
+                },
+                {
+                    path:'children',
+                    model:Tonic,
+                    select:"_id id name parentId image"
+                }
+            ]
+        }).exec();
+        return tonic;
+    }
+    catch(error:any){
+        throw new Error (`Error Fetching Tonic By Id : ${error.message}`);
+    }
+}

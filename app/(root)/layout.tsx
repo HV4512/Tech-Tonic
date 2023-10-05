@@ -34,7 +34,7 @@ export default function RootLayout({
             </div>
 
           </section>
-          <Rightsidebar/>
+          {/* <Rightsidebar/> */}
         </main>
 
         <Bottombar/>
