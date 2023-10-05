@@ -13,7 +13,7 @@ interface Params{
     path:string;
 }
 
-export const updateuser = async (
+export const updateuser = async(
     {userId,
     username,
     name,
