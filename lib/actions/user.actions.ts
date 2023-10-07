@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import User from "../models/user.model";
 import { connectToDB } from "../mongoose"
+import Tonic from "../models/tonic.model";
 
 interface Params{
     userId:string;
@@ -59,4 +60,32 @@ export const fetchUser =async(userId:string)=>{
         throw new Error(`Failed to fetch user: ${error.message}`);
     }
 
+}
+
+export const fetchUserPosts=async(userId:string)=>
+{
+    try {
+        connectToDB();
+        // Find All tonics authored by the user
+
+        // Todo Populate Community
+
+        const tonics = await User.findOne({id:userId})
+        .populate({
+            path:'tonics',
+            model:Tonic,
+            populate:{
+                path:'children',
+                model:Tonic,
+                populate:{
+                    path:'author',
+                    model:User,
+                    select:'name image Id'
+                }
+            }
+        })
+        return tonics;
+    } catch (error:any) {
+        throw new Error(`Error locating threads : ${error.message}`);
+    }
 }

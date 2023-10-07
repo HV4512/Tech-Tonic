@@ -3,6 +3,7 @@ import { currentUser } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import { fetchUser } from "@/lib/actions/user.actions";
 import { fetchTonicById } from "@/lib/actions/tonic.actions";
+import Comment from "@/components/forms/Comment";
 
 
 const page = async ({ params }: { params: { id: string } }) => {
@@ -30,7 +31,30 @@ const page = async ({ params }: { params: { id: string } }) => {
         comments={tonic.children}
       />
     </div>
+    <div className="mt-7">
+      <Comment
+      tonicId={tonic.id}
+      currentUserImg={userInfo.image}
+      currentUserId={JSON.stringify(userInfo._id)}
+      />
+    </div>
+    <div className="mt-10">
+      {tonic.children.map((childItem:any)=>(
+        <TonicCard
+        key={childItem._id}
+        id={childItem._id}
+        currentUserID={childItem?.id || ""}
+        parentId={childItem.parentId}
+        content={childItem.text}
+        author={childItem.author}
+        community={childItem.community}
+        createdAt={childItem.createdAt}
+        comments={childItem.children}
+        isComment
+      />
+      ))}
 
+    </div>
   </section>
   
   )
