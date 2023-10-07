@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import User from "../models/user.model";
 import { connectToDB } from "../mongoose"
 import Tonic from "../models/tonic.model";
+import { FilterQuery, SortOrder } from "mongoose";
 
 interface Params{
     userId:string;
@@ -87,5 +88,53 @@ export const fetchUserPosts=async(userId:string)=>
         return tonics;
     } catch (error:any) {
         throw new Error(`Error locating threads : ${error.message}`);
+    }
+}
+
+
+export const fetchUsers=async({
+    userId,
+    searchString="",
+    pageNumber=1,
+    pageSize=20,
+    sortBy="desc"
+}:{userId:string;
+    searchString?:string;
+    pageNumber?:number;
+    pageSize?:number;
+    sortBy?:SortOrder;
+}
+)=>
+{
+    try {
+        connectToDB();
+        const skips=(pageNumber-1)*pageSize;
+
+        const regex= new RegExp(searchString,"i");
+
+        const query: FilterQuery<typeof User> ={
+            id:{$ne:userId}
+        }
+
+        if(searchString.trim()!==''){
+            query.$or=[
+                {username:{$regex:regex}},
+                {name:{$regex:regex}}
+            ]
+        }
+        const sortOptions = {createdAt:sortBy};
+        const usersQuery = User.find(query)
+        .sort(sortOptions)
+        .skip(skips)
+        .limit(pageSize)
+
+        const totalUsersCount = await User.countDocuments(query);
+
+        const users = await usersQuery.exec();
+        const isNext=totalUsersCount>skips+users.length;
+
+        return {users,isNext};
+    } catch (error:any) {
+        throw new Error(`Error Fetching All the Users : ${error.message}`);
     }
 }

@@ -33,7 +33,7 @@
   }
 
   .community-card_btn {
-    @apply rounded-lg bg-primary-500 px-5 py-1.5 text-small-regular !text-light-1 !important;
+    @apply rounded-lg bg-purple-500 px-5 py-1.5 text-small-regular !text-light-1 !important;
   }
 
   /* thread card  */
@@ -51,7 +51,7 @@
   }
 
   .user-card_btn {
-    @apply h-auto min-w-[74px] rounded-lg bg-primary-500 text-[12px] text-light-1 !important;
+    @apply h-auto min-w-[74px] rounded-lg bg-purple-500 text-[12px] text-light-1 !important;
   }
 
   .searchbar {
