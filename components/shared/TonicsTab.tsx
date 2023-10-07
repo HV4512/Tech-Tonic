@@ -26,13 +26,10 @@ const TonicsTab = async ({ currentUserId, accountId, accountType }: Props) => {
                         parentId={tonic.parentId}
                         content={tonic.text}
                         author={
-                            accountType === "User"
-                                ? { name: result.name, image: result.image, id: result.id }
-                                : {
-                                    name: tonic.author.name,
-                                    image: tonic.author.image,
-                                    id: tonic.author.id,
-                                }
+                               { name: result.name, 
+                                image: result.image, 
+                                id: result.id }
+                  
                         }
                         community={tonic.community} //todo
                         createdAt={tonic.createdAt}
