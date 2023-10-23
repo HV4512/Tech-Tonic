@@ -23,7 +23,7 @@ import { useUploadThing } from "@/lib/uploadthing";
 import { isBase64Image } from "@/lib/utils";
 
 import { UserValidation } from "@/lib/validations/user";
-import { updateuser } from "@/lib/actions/user.actions";
+import { updateUser } from "@/lib/actions/user.actions";
 
 interface Props {
   user: {
@@ -67,7 +67,7 @@ const AccountProfile = ({ user, btnTitle }: Props) => {
     }
 
     // Todo: Update User Profile
-    await updateuser(
+    await updateUser(
       {userId:user.id,
        username:values.username,
       name:values.name,
