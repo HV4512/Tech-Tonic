@@ -1,3 +1,5 @@
+import { communityTabs } from "@/constants";
+import { formatDateString } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -109,7 +111,23 @@ const TonicCard = ({
                         </div>
                     </div>
                 </div>
+              {/* TODO: DELETE THREAD */}
+                {/* TODO: SHow comment logos */}
             </div>
+                {!isComment && community &&(
+                    <Link href={`/communities/${community.id}`} className="mt-5 flex items-center">
+                        <p className="text-subtle-mediu, text-gray-1">
+                            {formatDateString(createdAt)}
+                           {" "} - {community.name} Community
+                        </p>
+                        <Image
+                        src={community.image}
+                        alt={community.name}
+                        width={14}
+                        height={14}
+                        />
+                    </Link>
+                )}
         </article>
     )
 }

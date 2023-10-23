@@ -1,150 +1,240 @@
-"use server"
+"use server";
 
 import { revalidatePath } from "next/cache";
-import Tonic from "../models/tonic.model";
+
+import { connectToDB } from "../mongoose";
+
 import User from "../models/user.model";
-import { connectToDB } from "../mongoose"
-import { threadId } from "worker_threads";
+import Tonic from "../models/tonic.model";
+import Community from "../models/community.model";
+
+export async function fetchTonics(pageNumber = 1, pageSize = 20) {
+  connectToDB();
+
+  // Calculate the number of posts to skip based on the page number and page size.
+  const skipAmount = (pageNumber - 1) * pageSize;
+
+  // Create a query to fetch the posts that have no parent (top-level tonics) (a tonic that is not a comment/reply).
+  const postsQuery = Tonic.find({ parentId: { $in: [null, undefined] } })
+    .sort({ createdAt: "desc" })
+    .skip(skipAmount)
+    .limit(pageSize)
+    .populate({
+      path: "author",
+      model: User,
+    })
+    .populate({
+      path: "community",
+      model: Community,
+    })
+    .populate({
+      path: "children", // Populate the children field
+      populate: {
+        path: "author", // Populate the author field within children
+        model: User,
+        select: "_id name parentId image", // Select only _id and username fields of the author
+      },
+    });
+
+  // Count the total number of top-level posts (tonics) i.e., tonics that are not comments.
+  const totalPostsCount = await Tonic.countDocuments({
+    parentId: { $in: [null, undefined] },
+  }); // Get the total count of posts
+
+  const posts = await postsQuery.exec();
+
+  const isNext = totalPostsCount > skipAmount + posts.length;
+
+  return { posts, isNext };
+}
 
 interface Params {
-    text: string,
-    author: string,
-    communityId: string | null,
-    path: string,
+  text: string,
+  author: string,
+  communityId: string | null,
+  path: string,
 }
 
+export async function createTonic({ text, author, communityId, path }: Params
+) {
+  try {
+    connectToDB();
 
-export const createTonic = async ({ text, author, communityId, path }: Params) => {
-    try {
-        connectToDB();
-        const createdTonic = await Tonic.create(
-            {
-                text,
-                author,
-                community: null,
+    const communityIdObject = await Community.findOne(
+      { id: communityId },
+      { _id: 1 }
+    );
 
-            }
-        );
+    const createdTonic = await Tonic.create({
+      text,
+      author,
+      community: communityIdObject, // Assign communityId if provided, or leave it null for personal account
+    });
 
-        // Updaity user model after creating tonic
-        await User.findByIdAndUpdate(author, {
-            $push: { tonics: createdTonic._id }
-        })
+    // Update User model
+    await User.findByIdAndUpdate(author, {
+      $push: { tonics: createdTonic._id },
+    });
 
-        revalidatePath(path);
+    if (communityIdObject) {
+      // Update Community model
+      await Community.findByIdAndUpdate(communityIdObject, {
+        $push: { tonics: createdTonic._id },
+      });
     }
-    catch (error: any) {
-        throw new Error(`Error creating tonic: ${error.message}`)
-    }
+
+    revalidatePath(path);
+  } catch (error: any) {
+    throw new Error(`Failed to create tonic: ${error.message}`);
+  }
 }
 
-export const fetchTonics = async (pageNumber = 1, pageSize = 20) => {
-    try {
-        connectToDB();
+async function fetchAllChildTonics(tonicId: string): Promise<any[]> {
+  const childTonics = await Tonic.find({ parentId: tonicId });
 
-        // Calculating the number of posts to skip for moving to further pages.
-        const skips = (pageNumber - 1) * pageSize;
+  const descendantTonics = [];
+  for (const childTonic of childTonics) {
+    const descendants = await fetchAllChildTonics(childTonic._id);
+    descendantTonics.push(childTonic, ...descendants);
+  }
 
-        // Fetch the posts that do not have any parents which means only top level tonics and non comment tonics.
-        const postsQuery = Tonic.find({ parentId: { $in: [null, undefined] } })
-            .sort({ createdAt: 'desc' })
-            .skip(skips)
-            .limit(pageSize)
-            .populate({ path: 'author', model: User })
-            .populate({
-                path: 'children',
-                populate: {
-                    path: 'author',
-                    model: User,
-                    select: "_id name parentId image"
-                }
-            })
-
-        const totalPostsCount = await Tonic.countDocuments({
-            parentId: { $in: [null, undefined] },
-        })
-
-        const posts = await postsQuery.exec();
-
-        const isNext = totalPostsCount > skips + posts.length;
-        return { posts, isNext }
-
-    } catch (error: any) {
-        throw new Error(`Error Fetching Tonics: ${error.message}`)
-    }
+  return descendantTonics;
 }
 
-export const fetchTonicById = async (id: string) => {
-    try {
+export async function deleteTonic(id: string, path: string): Promise<void> {
+  try {
+    connectToDB();
 
-        // TODO: POPULATE Community 
-        connectToDB();
-        const tonic = await Tonic.findById(id)
-            .populate({
-                path: 'author',
-                model: User,
-                select: "_id id name image"
-            })
-            .populate({
-                path: 'children',
-                populate: [
-                    {
-                        path: 'author',
-                        model: User,
-                        select: "_id id name parentId image"
-                    },
-                    {
-                        path: 'children',
-                        model: Tonic,
-                        select: "_id id name parentId image"
-                    }
-                ]
-            }).exec();
-        return tonic;
+    // Find the tonic to be deleted (the main tonic)
+    const mainTonic = await Tonic.findById(id).populate("author community");
+
+    if (!mainTonic) {
+      throw new Error("Tonic not found");
     }
-    catch (error: any) {
-        throw new Error(`Error Fetching Tonic By Id : ${error.message}`);
-    }
+
+    // Fetch all child tonics and their descendants recursively
+    const descendantTonics = await fetchAllChildTonics(id);
+
+    // Get all descendant tonic IDs including the main tonic ID and child tonic IDs
+    const descendantTonicIds = [
+      id,
+      ...descendantTonics.map((tonic) => tonic._id),
+    ];
+
+    // Extract the authorIds and communityIds to update User and Community models respectively
+    const uniqueAuthorIds = new Set(
+      [
+        ...descendantTonics.map((tonic) => tonic.author?._id?.toString()), // Use optional chaining to handle possible undefined values
+        mainTonic.author?._id?.toString(),
+      ].filter((id) => id !== undefined)
+    );
+
+    const uniqueCommunityIds = new Set(
+      [
+        ...descendantTonics.map((tonic) => tonic.community?._id?.toString()), // Use optional chaining to handle possible undefined values
+        mainTonic.community?._id?.toString(),
+      ].filter((id) => id !== undefined)
+    );
+
+    // Recursively delete child tonics and their descendants
+    await Tonic.deleteMany({ _id: { $in: descendantTonicIds } });
+
+    // Update User model
+    await User.updateMany(
+      { _id: { $in: Array.from(uniqueAuthorIds) } },
+      { $pull: { tonics: { $in: descendantTonicIds } } }
+    );
+
+    // Update Community model
+    await Community.updateMany(
+      { _id: { $in: Array.from(uniqueCommunityIds) } },
+      { $pull: { tonics: { $in: descendantTonicIds } } }
+    );
+
+    revalidatePath(path);
+  } catch (error: any) {
+    throw new Error(`Failed to delete tonic: ${error.message}`);
+  }
 }
 
-export const addCommentToTonic = 
-async (
-        tonicId: string,
-        commentText: string,
-        userId: string,
-        path: string,
-        ) => {
-            try {
-                connectToDB();
+export async function fetchTonicById(tonicId: string) {
+  connectToDB();
 
-                // Find the original tonic by id (Parent Tonic)
-                const originaltonic = await Tonic.findById(tonicId);
-                if(!originaltonic)
-                {
-                    throw new Error(`Tonic Not Found`);
-                }
+  try {
+    const tonic = await Tonic.findById(tonicId)
+      .populate({
+        path: "author",
+        model: User,
+        select: "_id id name image",
+      }) // Populate the author field with _id and username
+      .populate({
+        path: "community",
+        model: Community,
+        select: "_id id name image",
+      }) // Populate the community field with _id and name
+      .populate({
+        path: "children", // Populate the children field
+        populate: [
+          {
+            path: "author", // Populate the author field within children
+            model: User,
+            select: "_id id name parentId image", // Select only _id and username fields of the author
+          },
+          {
+            path: "children", // Populate the children field within children
+            model: Tonic, // The model of the nested children (assuming it's the same "Tonic" model)
+            populate: {
+              path: "author", // Populate the author field within nested children
+              model: User,
+              select: "_id id name parentId image", // Select only _id and username fields of the author
+            },
+          },
+        ],
+      })
+      .exec();
 
-                // Create a new tonic as comments are also individual child tonics
-                const commentTonic = new Tonic({
-                    text:commentText,
-                    author:userId,
-                    parentId:tonicId,
-                })
+    return tonic;
+  } catch (err) {
+    console.error("Error while fetching tonic:", err);
+    throw new Error("Unable to fetch tonic");
+  }
+}
 
-                // Saving the new tonic
-                const savedCommentTonic = await commentTonic.save();
+export async function addCommentToTonic(
+  tonicId: string,
+  commentText: string,
+  userId: string,
+  path: string
+) {
+  connectToDB();
 
-                // Update the original tonic to include the new tonic i.e. the Comment Tonic
-                originaltonic.children.push(savedCommentTonic._id);
-            
-                // Saving the original Tonic
+  try {
+    // Find the original tonic by its ID
+    const originalTonic = await Tonic.findById(tonicId);
 
-                await originaltonic.save();
-                revalidatePath(path);
-            } 
-            catch (error:any) {
-                throw new Error (`Error adding comments to Tonic : ${error.message}`)
-                
-            }
+    if (!originalTonic) {
+      throw new Error("Tonic not found");
+    }
 
+    // Create the new comment tonic
+    const commentTonic = new Tonic({
+      text: commentText,
+      author: userId,
+      parentId: tonicId, // Set the parentId to the original tonic's ID
+    });
+
+    // Save the comment tonic to the database
+    const savedCommentTonic = await commentTonic.save();
+
+    // Add the comment tonic's ID to the original tonic's children array
+    originalTonic.children.push(savedCommentTonic._id);
+
+    // Save the updated original tonic to the database
+    await originalTonic.save();
+
+    revalidatePath(path);
+  } catch (err) {
+    console.error("Error while adding comment:", err);
+    throw new Error("Unable to add comment");
+  }
 }

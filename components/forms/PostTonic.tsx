@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useOrganization } from "@clerk/nextjs";
 import {
   Form,
   FormControl,
@@ -37,6 +38,7 @@ const PostTonic = ({ userId }: { userId: string }) => {
 
   const router = useRouter();
   const pathname = usePathname();
+  const {organization} = useOrganization();
   const form = useForm({
     resolver: zodResolver(TonicValidation),
     defaultValues: {
@@ -49,7 +51,7 @@ const PostTonic = ({ userId }: { userId: string }) => {
     await createTonic({
       text:values.tonic,
       author:userId,
-      communityId:null,
+      communityId:organization?organization.id:null,
       path:pathname
 
     });
