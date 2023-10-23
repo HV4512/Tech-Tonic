@@ -87,7 +87,7 @@ export const fetchUserPosts=async(userId:string)=>
         })
         return tonics;
     } catch (error:any) {
-        throw new Error(`Error locating threads : ${error.message}`);
+        throw new Error(`Error locating Tonics : ${error.message}`);
     }
 }
 
@@ -137,4 +137,34 @@ export const fetchUsers=async({
     } catch (error:any) {
         throw new Error(`Error Fetching All the Users : ${error.message}`);
     }
+}
+
+export const getActivity = async(userId:string) =>{
+    try {
+        connectToDB();
+
+        // Find all tonics created by user
+
+        const userTonics = await Tonic.find({author:userId});
+
+        // Collect all child tonics ids
+         
+        const childTonicIds = userTonics.reduce((acc,userTonic)=>{
+            return acc.concat(userTonic.children)
+        },[])
+
+
+        const replies  = await Tonic.find({
+            _id:{$in:childTonicIds},
+            author:{$ne:userId}
+        }).populate({
+            path:'author',
+            model:User,
+            select:'name image _id'
+        })
+
+    } catch (error:any) {
+        throw new Error(`Failed to fetch activity: ${error.message}`);
+    }
+
 }
