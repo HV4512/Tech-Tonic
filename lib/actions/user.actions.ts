@@ -163,6 +163,8 @@ export const getActivity = async(userId:string) =>{
             select:'name image _id'
         })
 
+        return replies;
+
     } catch (error:any) {
         throw new Error(`Failed to fetch activity: ${error.message}`);
     }

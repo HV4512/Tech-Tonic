@@ -18,11 +18,11 @@ async function Page() {
     <>
       <h1 className='head-text'>Activity</h1>
 
-      {/* <section className='mt-10 flex flex-col gap-5'>
+      <section className='mt-10 flex flex-col gap-5'>
         {activity.length>0? (
           <>
             {activity.map((activity) => (
-              <Link key={activity._id} href={`/thread/${activity.parentId}`}>
+              <Link key={activity._id} href={`/tonic/${activity.parentId}`}>
                 <article className='activity-card'>
                   <Image
                     src={activity.author.image}
@@ -35,7 +35,7 @@ async function Page() {
                     <span className='mr-1 text-primary-500'>
                       {activity.author.name}
                     </span>{" "}
-                    replied to your thread
+                    replied to your tonic
                   </p>
                 </article>
               </Link>
@@ -45,7 +45,7 @@ async function Page() {
         (
           <p className='!text-base-regular text-light-3'>No activity yet</p>
         )}
-      </section> */}
+      </section>
     </>
   );
 }
